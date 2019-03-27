@@ -6,13 +6,21 @@
 
 ECharts is a free, powerful charting and visualization library offering an easy way of adding intuitive, interactive, and highly customizable charts to your commercial products. It is written in pure JavaScript and based on <a href="https://github.com/ecomfe/zrender">zrender</a>, which is a whole new lightweight canvas library.
 
-**[中文官网](http://echarts.baidu.com)** | **[HOMEPAGE EN](http://ecomfe.github.io/echarts-doc/public/en/index.html)**
+Now ECharts is an incubator project of Apache Software Foundation.
+Please check its incubator status [here](http://incubator.apache.org/projects/echarts.html)
+
+**[中文官网](http://echarts.baidu.com)** | **[ENGLISH HOMEPAGE](https://echarts.apache.org/index.html)**
+
+[![Build Status](https://travis-ci.org/apache/incubator-echarts.svg?branch=master)](https://travis-ci.org/apache/incubator-echarts) [![](https://img.shields.io/npm/dw/echarts.svg?label=npm%20downloads&style=flat)](https://www.npmjs.com/package/echarts) ![Commits Since 4.0.0](https://img.shields.io/github/commits-since/apache/incubator-echarts/4.0.0.svg?colorB=%234c1&style=flat)
 
 ## Get ECharts
 
-+ Download from [echarts.baidu.com](http://echarts.baidu.com/download.html)
+You may choose one of the following methods:
 
++ Download from Official Website in [中文下载页](http://echarts.baidu.com/download.html)
++ Download from Official Website in [English](https://ecomfe.github.io/echarts-doc/public/en/download.html)
 + `npm install echarts --save`
++ CDN: [jsDelivr CDN](https://www.jsdelivr.com/package/npm/echarts?path=dist)
 
 ## Get ECharts GL
 
@@ -43,17 +51,25 @@ ECharts-GL is an extension pack of ECharts, which provides 3D plots, globe visua
 
 [https://github.com/ecomfe/awesome-echarts](https://github.com/ecomfe/awesome-echarts)
 
-### Extensions
+### Official Extensions
 
-+ [水球图 liquidfill](https://github.com/ecomfe/echarts-liquidfill)
++ [水球图 Liquidfill](https://github.com/ecomfe/echarts-liquidfill)
 
-+ [字符云 wordcloud](https://github.com/ecomfe/echarts-wordcloud)
++ [字符云 Wordcloud](https://github.com/ecomfe/echarts-wordcloud)
 
 + [Graph Modularity](https://github.com/ecomfe/echarts-graph-modularity) Graph modularity extension for community detection
 
-#### GIS
-
 + [百度地图扩展](https://github.com/ecomfe/echarts/tree/master/extension/bmap)
+
++ [vue-echarts](https://github.com/ecomfe/vue-echarts) ECharts component for Vue.js
+
++ [echarts-stat](https://github.com/ecomfe/echarts-stat) Statistics tool for ECharts
+
+
+### Developers Contributions
+
+
+#### GIS
 
 + [leaflet-echarts](https://github.com/wandergis/leaflet-echarts3) by wandergis
 + [arcgis-echarts](https://github.com/wandergis/arcgis-echarts3) by wandergis
@@ -62,6 +78,14 @@ ECharts-GL is an extension pack of ECharts, which provides 3D plots, globe visua
 
 + [ol3Echarts](https://github.com/sakitam-fdd/ol3Echarts) by sakitam-fdd
 
+#### Map Data and Tools
+
++ [echarts-mapmaker](https://github.com/echarts-maps/echarts-mapmaker) by chfw
++ [echarts-cities-js](https://github.com/echarts-maps/echarts-cities-js) by chfw
++ [echarts-china-cities-js](https://github.com/echarts-maps/echarts-china-cities-js) by chfw
++ [echarts-countries-js](https://github.com/echarts-maps/echarts-countries-js) by chfw
+
+
 #### AngularJS Binding
 
 + [angular-echarts](https://github.com/wangshijun/angular-echarts) by wangshijun
@@ -69,9 +93,13 @@ ECharts-GL is an extension pack of ECharts, which provides 3D plots, globe visua
 + [ng-echarts](https://github.com/liekkas/ng-echarts) by liekkas
 + [ngx-echarts](https://github.com/xieziyu/ngx-echarts) by xieziyu
 
+#### Ember Binding
++ [echarts-ember](https://github.com/bruckwubete/echarts-ember) by [bruck wubete](https://github.com/bruckwubete)
++ [ember-cli-echarts](https://github.com/funnelcloudinc/ember-cli-echarts) by FunnelCloud
+
 #### Vue Component
 
-+ [vue-echarts](https://github.com/Justineo/vue-echarts) by Justineo
++ [vue-echarts](https://github.com/ecomfe/vue-echarts) by ecomfe
 + [vue-echarts](https://github.com/panteng/vue-echarts) by panteng
 + [vue-echarts-v3](https://github.com/xlsdg/vue-echarts-v3) by xlsdg
 
@@ -99,6 +127,7 @@ ECharts-GL is an extension pack of ECharts, which provides 3D plots, globe visua
 + [recharts](https://github.com/taiyun/recharts) by taiyun
 + [recharts](https://github.com/yihui/recharts) by yihui
 + [ECharts2Shiny](https://github.com/XD-DENG/ECharts2Shiny) by XD-DENG
++ [echarts4r](https://github.com/JohnCoene/echarts4r) by JohnCoene
 
 #### Julia
 
@@ -135,4 +164,15 @@ Check this tutorial [Create Custom Build of ECharts](https://ecomfe.github.io/ec
 
 ## License
 
-ECharts is available under the BSD 3 license.
+ECharts is available under the Apache License V2.
+
+## Code of Conduct
+
+Please refer to [Apache Code of Conduct](https://www.apache.org/foundation/policies/conduct.html).
+
+## Reference Paper
+
+Deqing Li, Honghui Mei, Yi Shen, Shuang Su, Wenli Zhang, Junting Wang, Ming Zu, Wei Chen.
+[ECharts: A Declarative Framework for Rapid Construction of Wed-based Visualization](https://www.sciencedirect.com/science/article/pii/S2468502X18300068).
+Visual Informatics, 2018.
+

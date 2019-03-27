@@ -1,3 +1,22 @@
+/*
+* Licensed to the Apache Software Foundation (ASF) under one
+* or more contributor license agreements.  See the NOTICE file
+* distributed with this work for additional information
+* regarding copyright ownership.  The ASF licenses this file
+* to you under the Apache License, Version 2.0 (the
+* "License"); you may not use this file except in compliance
+* with the License.  You may obtain a copy of the License at
+*
+*   http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing,
+* software distributed under the License is distributed on an
+* "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+* KIND, either express or implied.  See the License for the
+* specific language governing permissions and limitations
+* under the License.
+*/
+
 /**
  * @module echarts/chart/helper/Line
  */
@@ -41,22 +60,21 @@ function createSymbol(name, lineData, idx) {
 
 function createLine(points) {
     var line = new LinePath({
-        name: 'line'
+        name: 'line',
+        subPixelOptimize: true
     });
     setLinePoints(line.shape, points);
     return line;
 }
 
 function setLinePoints(targetShape, points) {
-    var p1 = points[0];
-    var p2 = points[1];
-    var cp1 = points[2];
-    targetShape.x1 = p1[0];
-    targetShape.y1 = p1[1];
-    targetShape.x2 = p2[0];
-    targetShape.y2 = p2[1];
+    targetShape.x1 = points[0][0];
+    targetShape.y1 = points[0][1];
+    targetShape.x2 = points[1][0];
+    targetShape.y2 = points[1][1];
     targetShape.percent = 1;
 
+    var cp1 = points[2];
     if (cp1) {
         targetShape.cpx1 = cp1[0];
         targetShape.cpy1 = cp1[1];
@@ -67,7 +85,7 @@ function setLinePoints(targetShape, points) {
     }
 }
 
-function updateSymbolAndLabelBeforeLineUpdate () {
+function updateSymbolAndLabelBeforeLineUpdate() {
     var lineGroup = this;
     var symbolFrom = lineGroup.childOfName('fromSymbol');
     var symbolTo = lineGroup.childOfName('toSymbol');
@@ -187,7 +205,6 @@ lineProto.beforeUpdate = updateSymbolAndLabelBeforeLineUpdate;
 lineProto._createLine = function (lineData, idx, seriesScope) {
     var seriesModel = lineData.hostModel;
     var linePoints = lineData.getItemLayout(idx);
-
     var line = createLine(linePoints);
     line.shape.percent = 0;
     graphic.initProps(line, {
@@ -199,7 +216,11 @@ lineProto._createLine = function (lineData, idx, seriesScope) {
     this.add(line);
 
     var label = new graphic.Text({
-        name: 'label'
+        name: 'label',
+        // FIXME
+        // Temporary solution for `focusNodeAdjacency`.
+        // line label do not use the opacity of lineStyle.
+        lineLabelOriginalOpacity: 1
     });
     this.add(label);
 
@@ -223,6 +244,7 @@ lineProto.updateData = function (lineData, idx, seriesScope) {
     var target = {
         shape: {}
     };
+
     setLinePoints(target.shape, linePoints);
     graphic.updateProps(line, target, seriesModel, idx);
 
@@ -255,11 +277,11 @@ lineProto._updateCommonStl = function (lineData, idx, seriesScope) {
     if (!seriesScope || lineData.hasItemOption) {
         var itemModel = lineData.getItemModel(idx);
 
-        lineStyle = itemModel.getModel('lineStyle.normal').getLineStyle();
-        hoverLineStyle = itemModel.getModel('lineStyle.emphasis').getLineStyle();
+        lineStyle = itemModel.getModel('lineStyle').getLineStyle();
+        hoverLineStyle = itemModel.getModel('emphasis.lineStyle').getLineStyle();
 
-        labelModel = itemModel.getModel('label.normal');
-        hoverLabelModel = itemModel.getModel('label.emphasis');
+        labelModel = itemModel.getModel('label');
+        hoverLabelModel = itemModel.getModel('emphasis.label');
     }
 
     var visualColor = lineData.getItemVisual(idx, 'color');
@@ -296,32 +318,36 @@ lineProto._updateCommonStl = function (lineData, idx, seriesScope) {
 
     var label = this.childOfName('label');
     var defaultLabelColor;
-    var defaultText;
-    var normalText;
-    var emphasisText;
+    var baseText;
 
+    // FIXME: the logic below probably should be merged to `graphic.setLabelStyle`.
     if (showLabel || hoverShowLabel) {
-        var rawVal = seriesModel.getRawValue(idx);
-        defaultText = rawVal == null
-            ? defaultText = lineData.getName(idx)
-            : isFinite(rawVal)
-            ? round(rawVal)
-            : rawVal;
         defaultLabelColor = visualColor || '#000';
 
-        normalText = zrUtil.retrieve2(
-            seriesModel.getFormattedLabel(idx, 'normal', lineData.dataType),
-            defaultText
-        );
-        emphasisText = zrUtil.retrieve2(
-            seriesModel.getFormattedLabel(idx, 'emphasis', lineData.dataType),
-            normalText
-        );
+        baseText = seriesModel.getFormattedLabel(idx, 'normal', lineData.dataType);
+        if (baseText == null) {
+            var rawVal = seriesModel.getRawValue(idx);
+            baseText = rawVal == null
+                ? lineData.getName(idx)
+                : isFinite(rawVal)
+                ? round(rawVal)
+                : rawVal;
+        }
     }
+    var normalText = showLabel ? baseText : null;
+    var emphasisText = hoverShowLabel
+        ? zrUtil.retrieve2(
+            seriesModel.getFormattedLabel(idx, 'emphasis', lineData.dataType),
+            baseText
+        )
+        : null;
 
-    // label.afterUpdate = lineAfterUpdate;
-    if (showLabel) {
-        var labelStyle = graphic.setTextStyle(label.style, labelModel, {
+    var labelStyle = label.style;
+
+    // Always set `textStyle` even if `normalStyle.text` is null, because default
+    // values have to be set on `normalStyle`.
+    if (normalText != null || emphasisText != null) {
+        graphic.setTextStyle(label.style, labelModel, {
             text: normalText
         }, {
             autoColor: defaultLabelColor
@@ -332,11 +358,8 @@ lineProto._updateCommonStl = function (lineData, idx, seriesScope) {
         // 'start', 'middle', 'end'
         label.__position = labelModel.get('position') || 'middle';
     }
-    else {
-        label.setStyle('text', null);
-    }
 
-    if (hoverShowLabel) {
+    if (emphasisText != null) {
         // Only these properties supported in this emphasis style here.
         label.hoverStyle = {
             text: emphasisText,

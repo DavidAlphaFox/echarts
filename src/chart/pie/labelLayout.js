@@ -1,13 +1,33 @@
+/*
+* Licensed to the Apache Software Foundation (ASF) under one
+* or more contributor license agreements.  See the NOTICE file
+* distributed with this work for additional information
+* regarding copyright ownership.  The ASF licenses this file
+* to you under the Apache License, Version 2.0 (the
+* "License"); you may not use this file except in compliance
+* with the License.  You may obtain a copy of the License at
+*
+*   http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing,
+* software distributed under the License is distributed on an
+* "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+* KIND, either express or implied.  See the License for the
+* specific language governing permissions and limitations
+* under the License.
+*/
+
 // FIXME emphasis label position is not same with normal label position
 
 import * as textContain from 'zrender/src/contain/text';
+
+var RADIAN = Math.PI / 180;
 
 function adjustSingleSide(list, cx, cy, r, dir, viewWidth, viewHeight) {
     list.sort(function (a, b) {
         return a.y - b.y;
     });
 
-    // 压
     function shiftDown(start, end, delta, dir) {
         for (var j = start; j < end; j++) {
             list[j].y += delta;
@@ -23,7 +43,6 @@ function adjustSingleSide(list, cx, cy, r, dir, viewWidth, viewHeight) {
         shiftUp(end - 1, delta / 2);
     }
 
-    // 弹
     function shiftUp(end, delta) {
         for (var j = end; j >= 0; j--) {
             list[j].y -= delta;
@@ -37,18 +56,14 @@ function adjustSingleSide(list, cx, cy, r, dir, viewWidth, viewHeight) {
 
     function changeX(list, isDownList, cx, cy, r, dir) {
         var lastDeltaX = dir > 0
-            ? isDownList                // 右侧
-                ? Number.MAX_VALUE      // 下
-                : 0                     // 上
-            : isDownList                // 左侧
-                ? Number.MAX_VALUE      // 下
-                : 0;                    // 上
+            ? isDownList                // right-side
+                ? Number.MAX_VALUE      // down
+                : 0                     // up
+            : isDownList                // left-side
+                ? Number.MAX_VALUE      // down
+                : 0;                    // up
 
         for (var i = 0, l = list.length; i < l; i++) {
-            // Not change x for center label
-            if (list[i].position === 'center') {
-                continue;
-            }
             var deltaY = Math.abs(list[i].y - cy);
             var length = list[i].len;
             var length2 = list[i].len2;
@@ -59,11 +74,11 @@ function adjustSingleSide(list, cx, cy, r, dir, viewWidth, viewHeight) {
                     )
                 : Math.abs(list[i].x - cx);
             if (isDownList && deltaX >= lastDeltaX) {
-                // 右下，左下
+                // right-down, left-down
                 deltaX = lastDeltaX - 10;
             }
             if (!isDownList && deltaX <= lastDeltaX) {
-                // 右上，左上
+                // right-up, left-up
                 deltaX = lastDeltaX + 10;
             }
 
@@ -103,6 +118,9 @@ function avoidOverlap(labelLayoutList, cx, cy, r, viewWidth, viewHeight) {
     var leftList = [];
     var rightList = [];
     for (var i = 0; i < labelLayoutList.length; i++) {
+        if (isPositionCenter(labelLayoutList[i])) {
+            continue;
+        }
         if (labelLayoutList[i].x < cx) {
             leftList.push(labelLayoutList[i]);
         }
@@ -115,6 +133,9 @@ function avoidOverlap(labelLayoutList, cx, cy, r, viewWidth, viewHeight) {
     adjustSingleSide(leftList, cx, cy, r, -1, viewWidth, viewHeight);
 
     for (var i = 0; i < labelLayoutList.length; i++) {
+        if (isPositionCenter(labelLayoutList[i])) {
+            continue;
+        }
         var linePoints = labelLayoutList[i].linePoints;
         if (linePoints) {
             var dist = linePoints[1][0] - linePoints[2][0];
@@ -130,24 +151,34 @@ function avoidOverlap(labelLayoutList, cx, cy, r, viewWidth, viewHeight) {
     }
 }
 
-export default function (seriesModel, r, viewWidth, viewHeight) {
+function isPositionCenter(layout) {
+    // Not change x for center label
+    return layout.position === 'center';
+}
+
+export default function (seriesModel, r, viewWidth, viewHeight, sum) {
     var data = seriesModel.getData();
     var labelLayoutList = [];
     var cx;
     var cy;
     var hasLabelRotate = false;
+    var minShowLabelRadian = (seriesModel.get('minShowLabelAngle') || 0) * RADIAN;
 
     data.each(function (idx) {
         var layout = data.getItemLayout(idx);
 
         var itemModel = data.getItemModel(idx);
-        var labelModel = itemModel.getModel('label.normal');
+        var labelModel = itemModel.getModel('label');
         // Use position in normal or emphasis
-        var labelPosition = labelModel.get('position') || itemModel.get('label.emphasis.position');
+        var labelPosition = labelModel.get('position') || itemModel.get('emphasis.label.position');
 
-        var labelLineModel = itemModel.getModel('labelLine.normal');
+        var labelLineModel = itemModel.getModel('labelLine');
         var labelLineLen = labelLineModel.get('length');
         var labelLineLen2 = labelLineModel.get('length2');
+
+        if (layout.angle < minShowLabelRadian) {
+            return;
+        }
 
         var midAngle = (layout.startAngle + layout.endAngle) / 2;
         var dx = Math.cos(midAngle);

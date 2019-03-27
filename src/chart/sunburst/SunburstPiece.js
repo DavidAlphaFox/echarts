@@ -1,3 +1,22 @@
+/*
+* Licensed to the Apache Software Foundation (ASF) under one
+* or more contributor license agreements.  See the NOTICE file
+* distributed with this work for additional information
+* regarding copyright ownership.  The ASF licenses this file
+* to you under the Apache License, Version 2.0 (the
+* "License"); you may not use this file except in compliance
+* with the License.  You may obtain a copy of the License at
+*
+*   http://www.apache.org/licenses/LICENSE-2.0
+*
+* Unless required by applicable law or agreed to in writing,
+* software distributed under the License is distributed on an
+* "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+* KIND, either express or implied.  See the License for the
+* specific language governing permissions and limitations
+* under the License.
+*/
+
 import * as zrUtil from 'zrender/src/core/util';
 import * as graphic from '../../util/graphic';
 
@@ -23,9 +42,11 @@ function SunburstPiece(node, seriesModel, ecModel) {
     var sector = new graphic.Sector({
         z2: DEFAULT_SECTOR_Z
     });
+    sector.seriesIndex = seriesModel.seriesIndex;
+
     var text = new graphic.Text({
         z2: DEFAULT_TEXT_Z,
-        silent: node.getModel('label.normal').get('silent')
+        silent: node.getModel('label').get('silent')
     });
     this.add(sector);
     this.add(text);
@@ -65,25 +86,30 @@ SunburstPieceProto.updateData = function (
 
     var itemModel = node.getModel();
     var layout = node.getLayout();
+    // if (!layout) {
+    //     console.log(node.getLayout());
+    // }
     var sectorShape = zrUtil.extend({}, layout);
     sectorShape.label = null;
 
-    var itemStyleModel = itemModel.getModel('itemStyle');
     var visualColor = getNodeColor(node, seriesModel, ecModel);
 
-    var normalStyle = itemStyleModel.getModel('normal').getItemStyle();
+    fillDefaultColor(node, seriesModel, visualColor);
+
+    var normalStyle = itemModel.getModel('itemStyle').getItemStyle();
     var style;
     if (state === 'normal') {
         style = normalStyle;
     }
     else {
-        var stateStyle = itemStyleModel.getModel(state).getItemStyle();
+        var stateStyle = itemModel.getModel(state + '.itemStyle')
+            .getItemStyle();
         style = zrUtil.merge(stateStyle, normalStyle);
     }
     style = zrUtil.defaults(
         {
             lineJoin: 'bevel',
-            fill: visualColor
+            fill: style.fill || visualColor
         },
         style
     );
@@ -103,6 +129,16 @@ SunburstPieceProto.updateData = function (
         );
         sector.useStyle(style);
     }
+    else if (typeof style.fill === 'object' && style.fill.type
+        || typeof sector.style.fill === 'object' && sector.style.fill.type
+    ) {
+        // Disable animation for gradient since no interpolation method
+        // is supported for gradient
+        graphic.updateProps(sector, {
+            shape: sectorShape
+        }, seriesModel);
+        sector.useStyle(style);
+    }
     else {
         graphic.updateProps(sector, {
             shape: sectorShape,
@@ -110,12 +146,7 @@ SunburstPieceProto.updateData = function (
         }, seriesModel);
     }
 
-    if (state === 'normal') {
-        sector.hoverStyle = itemStyleModel.getModel('emphasis').getItemStyle();
-        graphic.setHoverStyle(this);
-    }
-
-    this._updateLabel(seriesModel, ecModel, visualColor);
+    this._updateLabel(seriesModel, visualColor, state);
 
     var cursorStyle = itemModel.getShallow('cursor');
     cursorStyle && sector.attr('cursor', cursorStyle);
@@ -133,7 +164,10 @@ SunburstPieceProto.onEmphasis = function (highlightPolicy) {
     var that = this;
     this.node.hostTree.root.eachNode(function (n) {
         if (n.piece) {
-            if (isNodeHighlighted(n, that.node, highlightPolicy)) {
+            if (that.node === n) {
+                n.piece.updateData(false, n, 'emphasis');
+            }
+            else if (isNodeHighlighted(n, that.node, highlightPolicy)) {
                 n.piece.childAt(0).trigger('highlight');
             }
             else if (highlightPolicy !== NodeHighlightPolicy.NONE) {
@@ -159,25 +193,40 @@ SunburstPieceProto.onDownplay = function () {
     this.updateData(false, this.node, 'downplay');
 };
 
-SunburstPieceProto._updateLabel = function (seriesModel, ecModel, visualColor) {
+SunburstPieceProto._updateLabel = function (seriesModel, visualColor, state) {
     var itemModel = this.node.getModel();
-    var labelModel = itemModel.getModel('label.normal');
-    var labelHoverModel = itemModel.getModel('label.emphasis');
+    var normalModel = itemModel.getModel('label');
+    var labelModel = state === 'normal' || state === 'emphasis'
+        ? normalModel
+        : itemModel.getModel(state + '.label');
+    var labelHoverModel = itemModel.getModel('emphasis.label');
 
     var text = zrUtil.retrieve(
         seriesModel.getFormattedLabel(
-            this.node.dataIndex, 'normal', null, null, 'label'
+            this.node.dataIndex, state, null, null, 'label'
         ),
         this.node.name
     );
-    if (!labelModel.get('show')) {
+    if (getLabelAttr('show') === false) {
+        text = '';
+    }
+
+    var layout = this.node.getLayout();
+    var labelMinAngle = labelModel.get('minAngle');
+    if (labelMinAngle == null) {
+        labelMinAngle = normalModel.get('minAngle');
+    }
+    labelMinAngle = labelMinAngle / 180 * Math.PI;
+    var angle = layout.endAngle - layout.startAngle;
+    if (labelMinAngle != null && Math.abs(angle) < labelMinAngle) {
+        // Not displaying text when angle is too small
         text = '';
     }
 
     var label = this.childAt(1);
 
     graphic.setLabelStyle(
-        label.style, label.hoverStyle = {}, labelModel, labelHoverModel,
+        label.style, label.hoverStyle || {}, normalModel, labelHoverModel,
         {
             defaultText: labelModel.getShallow('show') ? text : null,
             autoColor: visualColor,
@@ -185,23 +234,20 @@ SunburstPieceProto._updateLabel = function (seriesModel, ecModel, visualColor) {
         }
     );
 
-    var layout = this.node.getLayout();
     var midAngle = (layout.startAngle + layout.endAngle) / 2;
     var dx = Math.cos(midAngle);
     var dy = Math.sin(midAngle);
 
     var r;
-    var labelPosition = labelModel.get('position');
-    var labelPadding = labelModel.get('padding') || 0;
-    var textAlign = labelModel.get('align');
+    var labelPosition = getLabelAttr('position');
+    var labelPadding = getLabelAttr('distance') || 0;
+    var textAlign = getLabelAttr('align');
     if (labelPosition === 'outside') {
         r = layout.r + labelPadding;
-        if (!textAlign) {
-            textAlign = midAngle > Math.PI / 2 ? 'right' : 'left';
-        }
+        textAlign = midAngle > Math.PI / 2 ? 'right' : 'left';
     }
     else {
-        if (!textAlign) {
+        if (!textAlign || textAlign === 'center') {
             r = (layout.r + layout.r0) / 2;
             textAlign = 'center';
         }
@@ -222,15 +268,15 @@ SunburstPieceProto._updateLabel = function (seriesModel, ecModel, visualColor) {
     label.attr('style', {
         text: text,
         textAlign: textAlign,
-        textVerticalAlign: labelModel.get('verticalAlign') || 'middle',
-        opacity: labelModel.get('opacity')
+        textVerticalAlign: getLabelAttr('verticalAlign') || 'middle',
+        opacity: getLabelAttr('opacity')
     });
 
     var textX = r * dx + layout.cx;
     var textY = r * dy + layout.cy;
     label.attr('position', [textX, textY]);
 
-    var rotateType = labelModel.getShallow('rotate');
+    var rotateType = getLabelAttr('rotate');
     var rotate = 0;
     if (rotateType === 'radial') {
         rotate = -midAngle;
@@ -246,8 +292,20 @@ SunburstPieceProto._updateLabel = function (seriesModel, ecModel, visualColor) {
         else if (rotate < -Math.PI / 2) {
             rotate += Math.PI;
         }
+    } else if (typeof rotateType === 'number') {
+        rotate = rotateType * Math.PI / 180;
     }
     label.attr('rotation', rotate);
+
+    function getLabelAttr(name) {
+        var stateAttr = labelModel.get(name);
+        if (stateAttr == null) {
+            return normalModel.get(name);
+        }
+        else {
+            return stateAttr;
+        }
+    }
 };
 
 SunburstPieceProto._initEvents = function (
@@ -256,8 +314,6 @@ SunburstPieceProto._initEvents = function (
     seriesModel,
     highlightPolicy
 ) {
-    var itemModel = node.getModel();
-
     sector.off('mouseover').off('mouseout').off('emphasis').off('normal');
 
     var that = this;
@@ -274,7 +330,7 @@ SunburstPieceProto._initEvents = function (
         that.onHighlight();
     };
 
-    if (itemModel.get('hoverAnimation') && seriesModel.isAnimationEnabled()) {
+    if (seriesModel.isAnimationEnabled()) {
         sector
             .on('mouseover', onEmphasis)
             .on('mouseout', onNormal)
@@ -301,13 +357,13 @@ function getNodeColor(node, seriesModel, ecModel) {
     // Color from visualMap
     var visualColor = node.getVisual('color');
     var visualMetaList = node.getVisual('visualMeta');
-    if (visualMetaList.length === 0) {
+    if (!visualMetaList || visualMetaList.length === 0) {
         // Use first-generation color if has no visualMap
         visualColor = null;
     }
 
     // Self color or level color
-    var color = node.getModel('itemStyle.normal').get('color');
+    var color = node.getModel('itemStyle').get('color');
     if (color) {
         return color;
     }
@@ -351,9 +407,15 @@ function isNodeHighlighted(node, activeNode, policy) {
         return node === activeNode;
     }
     else if (policy === NodeHighlightPolicy.ANCESTOR) {
-        return  node === activeNode || node.isAncestorOf(activeNode);
+        return node === activeNode || node.isAncestorOf(activeNode);
     }
     else {
         return node === activeNode || node.isDescendantOf(activeNode);
     }
+}
+
+// Fix tooltip callback function params.color incorrect when pick a default color
+function fillDefaultColor(node, seriesModel, color) {
+    var data = seriesModel.getData();
+    data.setItemVisual(node.dataIndex, 'color', color);
 }
